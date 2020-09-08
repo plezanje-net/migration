@@ -14,8 +14,6 @@ export class Countries extends Transfer {
         const sourceRes = await this.dbs.source.request()
             .query('SELECT * FROM dbo.Country');
 
-        let idMap: any = {};
-
         for (let record of sourceRes.recordset) {
 
             await this.createCountry({

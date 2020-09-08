@@ -7,6 +7,8 @@ import { Client } from 'ts-postgres';
 import { Areas } from '../helpers/migrate/areas';
 import { Crags } from '../helpers/migrate/crags';
 import { Books } from '../helpers/migrate/books';
+import { Routes } from '../helpers/migrate/routes';
+import { Users } from '../helpers/migrate/users';
 
 
 export default class Migrate extends Command {
@@ -45,8 +47,16 @@ export default class Migrate extends Command {
         books: {},
         countries: {},
         crags: {},
+        grades: {},
+        sectors: {},
+        routes: {},
+        users: {},
       }
     }
+
+    this.log('- Migrating users');
+    const userTransfer = new Users(dbs);
+    await userTransfer.start();
 
     this.log('- Migrating countries');
     const countryTransfer = new Countries(dbs);
@@ -63,6 +73,10 @@ export default class Migrate extends Command {
     this.log('- Migrating crags');
     const cragTransfer = new Crags(dbs);
     await cragTransfer.start();
+
+    this.log('- Migrating routes and sectors');
+    const routesTransfer = new Routes(dbs);
+    await routesTransfer.start();
 
     dbs.target.query("DELETE FROM area WHERE (SELECT COUNT(id) FROM crag WHERE \"areaId\" = area.id) = 0");
 
