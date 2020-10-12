@@ -3,13 +3,13 @@ import { default as slugify } from 'slugify';
 import { ConnectionPool, config } from 'mssql';
 import { Dbs } from '../helpers/migrate/dbs';
 import { Countries } from '../helpers/migrate/countries';
-import { Client } from 'ts-postgres';
 import { Areas } from '../helpers/migrate/areas';
 import { Crags } from '../helpers/migrate/crags';
 import { Books } from '../helpers/migrate/books';
 import { Routes } from '../helpers/migrate/routes';
 import { Users } from '../helpers/migrate/users';
 
+import { Client } from 'pg';
 
 export default class Migrate extends Command {
   static description = 'Migrate all from local MSSQL server to PostgreSQL'
@@ -34,10 +34,10 @@ export default class Migrate extends Command {
       host: 'localhost',
       user: 'plezanjenet',
       password: 'plezanjenet',
-      database: 'plezanjenet',
+      database: 'plezanjenet'
     });
 
-    await pgclient.connect();
+    await pgclient.connect()
 
     const dbs: Dbs = {
       source: await new ConnectionPool(msconfig).connect(),
