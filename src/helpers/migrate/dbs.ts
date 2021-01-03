@@ -1,5 +1,5 @@
 import { ConnectionPool } from 'mssql';
-import { Client } from 'ts-postgres';
+import { Client } from 'pg';
 
 export interface Dbs {
     source: ConnectionPool;

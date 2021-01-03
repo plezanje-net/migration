@@ -10,6 +10,8 @@ import { Routes } from '../helpers/migrate/routes';
 import { Users } from '../helpers/migrate/users';
 
 import { Client } from 'pg';
+import { Comments } from '../helpers/migrate/comments';
+import { Bbchtml } from '../helpers/migrate/bbchtml';
 
 export default class Migrate extends Command {
   static description = 'Migrate all from local MSSQL server to PostgreSQL'
@@ -35,6 +37,10 @@ export default class Migrate extends Command {
       user: 'plezanjenet',
       password: 'plezanjenet',
       database: 'plezanjenet'
+      // host: '35.246.30.8',
+      // user: 'postgres',
+      // password: 'vCeMJJvmaKjFOzOE',
+      // database: 'plezanjenet'
     });
 
     await pgclient.connect()
@@ -53,6 +59,8 @@ export default class Migrate extends Command {
         users: {},
       }
     }
+
+    this.log("### MIGRATION DONE ###");
 
     this.log('- Migrating users');
     const userTransfer = new Users(dbs);
@@ -78,9 +86,20 @@ export default class Migrate extends Command {
     const routesTransfer = new Routes(dbs);
     await routesTransfer.start();
 
+    this.log('- Migrating comments');
+    const commentsTransfer = new Comments(dbs);
+    await commentsTransfer.start();
+
     dbs.target.query("DELETE FROM area WHERE (SELECT COUNT(id) FROM crag WHERE \"areaId\" = area.id) = 0");
 
     dbs.target.query("DELETE FROM country WHERE (SELECT COUNT(id) FROM crag WHERE \"countryId\" = country.id) = 0");
+
+    dbs.target.query(`
+      UPDATE crag SET
+      "maxGrade" = (SELECT MAX(route.grade) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id)), 
+      "minGrade" = (SELECT MIN(route.grade) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id)),
+      "nrRoutes" = (SELECT COUNT(route.id) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id))    
+    `);
 
     this.log("### MIGRATION DONE ###");
   }

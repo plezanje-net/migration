@@ -2,7 +2,11 @@ import { Transfer } from './transfer';
 import { v4 } from 'uuid';
 import slugify from 'slugify';
 import { parse } from 'fast-xml-parser';
+import * as proj4 from 'proj4'
+import { Bbchtml } from './bbchtml';
 
+const gkProjection: string = '+proj=tmerc +lat_0=0 +lon_0=15 +k=0.9999 +x_0=500000 +y_0=-5000000 +ellps=bessel +towgs84=426.62,142.62,460.09,4.98,4.49,-12.42,-17.1 +units=m +no_defs +type=crs'
+const wgsProjection: string = '+proj=longlat +datum=WGS84 +no_defs'
 
 export class Crags extends Transfer {
 
@@ -11,6 +15,8 @@ export class Crags extends Transfer {
     async start() {
 
         this.dbs.target.query("TRUNCATE crag CASCADE;")
+
+        const bbchtml = new Bbchtml;
 
         const sourceRes = await this.dbs.source.request()
             .query('SELECT * FROM dbo.Crags WHERE PeakID IS NULL');
@@ -30,18 +36,24 @@ export class Crags extends Transfer {
 
             xmlData = record.XmlInfo != null ? parse(record.XmlInfo) : {};
 
+            let lngLat: number[] = [0,0];
+
+            try {
+                lngLat = proj4(gkProjection, wgsProjection).forward([record.X, record.Y])
+            } catch {}
+
             await this.createCrag({
                 id: v4(),
                 name: record.CragName,
                 slug: slug + slugPfx,
                 countryId: this.dbs.idmap.countries[record.CragCountry],
                 areaId: this.dbs.idmap.areas[record.ParentID] != null ? this.dbs.idmap.areas[record.ParentID] : null,
-                status: record.HideLevel == 1 ? 10 : 5,
-                lat: record.X,
-                lang: record.Y,
+                status: record.HideLevel == 1 ? 5 : 10,
+                lon: lngLat[0] == 0 ? null : lngLat[0] ,
+                lat: lngLat[1] == 0 ? null : lngLat[1],
                 orientation: xmlData.orient != null ? xmlData.orient : null,
-                access: xmlData.access != null ? xmlData.access : null,
-                description: xmlData.description != null ? xmlData.description : null,
+                access: xmlData.access != null ? bbchtml.conv(xmlData.access) : null,
+                description: xmlData.description != null ? bbchtml.conv(xmlData.description) : null,
                 legacy: record
             })
 
@@ -54,7 +66,7 @@ export class Crags extends Transfer {
     async createCrag(crag: any) {
         await this.dbs.target.query(`
             INSERT INTO crag 
-            (id, name, slug, \"countryId\", \"areaId\", status, lat, lang, orientation, access, description, legacy) 
+            (id, name, slug, \"countryId\", \"areaId\", status, lat, lon, orientation, access, description, legacy) 
             VALUES 
             ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [
             crag.id,
@@ -64,7 +76,7 @@ export class Crags extends Transfer {
             crag.areaId,
             crag.status,
             crag.lat,
-            crag.lang,
+            crag.lon,
             crag.orientation,
             crag.access,
             crag.description,
