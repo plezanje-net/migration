@@ -28,8 +28,8 @@ export class Bbchtml {
                 r: '<a href="$1">$1</a>'
             },
             {
-                f: /[\n\r][\n\r]/gm,
-                r: '\n<br>\n'
+                f: /[\n]/gm,
+                r: '<br>'
             },
             {
                 f: /\[\/img\]/gm,

@@ -20,8 +20,6 @@ export default class Migrate extends Command {
 
     await db.connect()
 
-    //
-
     this.log("### DONE ###");
   }
 
