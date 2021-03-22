@@ -16,6 +16,9 @@ import { Activity } from '../helpers/migrate/activity';
 import { Pitches } from '../helpers/migrate/pitches';
 import { boolean } from '@oclif/command/lib/flags';
 import { ActivityRoute } from '../helpers/migrate/activityroute';
+import { Images } from '../helpers/migrate/images';
+import { Peaks } from '../helpers/migrate/peaks';
+import { IceFalls } from '../helpers/migrate/icefalls';
 
 export default class Migrate extends Command {
 
@@ -24,7 +27,8 @@ export default class Migrate extends Command {
     crags: flags.boolean(),
     activity: flags.boolean(),
     pitches: flags.boolean(),
-    users: flags.boolean()
+    users: flags.boolean(),
+    images: flags.boolean()
   }
 
   static description = 'Migrate all from local MSSQL server to PostgreSQL'
@@ -74,10 +78,14 @@ export default class Migrate extends Command {
         pitches: {},
         users: {},
         activity: {},
+        images: {},
+        iceFalls: {},
+        peaks: {},
       }
     }
 
-    if (flags.all || flags.users) {
+    // if (flags.all || flags.users) {
+    if (false) {
       this.log("# USERS");
       this.log('- Migrating users');
       const userTransfer = new Users(dbs);
@@ -109,28 +117,42 @@ export default class Migrate extends Command {
       const areaTransfer = new Areas(dbs);
       await areaTransfer.start();
 
+      this.log('- Migrating peaks');
+      const peakTransfer = new Peaks(dbs);
+      await peakTransfer.start();
+
+      this.log('- Migrating ice falls');
+      const iceFallTransfer = new IceFalls(dbs);
+      await iceFallTransfer.start();
+
       this.log('- Migrating crags');
       const cragTransfer = new Crags(dbs);
       await cragTransfer.start();
 
-      this.log('- Migrating routes and sectors');
-      const routesTransfer = new Routes(dbs);
-      await routesTransfer.start();
+      // this.log('- Migrating routes and sectors');
+      // const routesTransfer = new Routes(dbs);
+      // await routesTransfer.start();
 
       this.log('- Migrating comments');
       const commentsTransfer = new Comments(dbs);
       await commentsTransfer.start();
 
-      dbs.target.query("DELETE FROM area WHERE (SELECT COUNT(id) FROM crag WHERE \"areaId\" = area.id) = 0");
+      dbs.target.query(`
+      UPDATE country SET
+        "nrCrags" = (SELECT COUNT(crag.id) FROM crag WHERE crag."countryId" = country.id AND crag."peakId" IS NULL)
+      `);
 
-      dbs.target.query("DELETE FROM country WHERE (SELECT COUNT(id) FROM crag WHERE \"countryId\" = country.id) = 0");
+      dbs.target.query(`
+      UPDATE area SET
+        "nrCrags" = (SELECT COUNT(crag.id) FROM crag WHERE crag."areaId" = area.id AND crag."peakId" IS NULL)
+      `);
 
       dbs.target.query(`
       UPDATE crag SET
-      "maxGrade" = (SELECT MAX(route.grade) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id)), 
-      "minGrade" = (SELECT MIN(route.grade) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id)),
-      "nrRoutes" = (SELECT COUNT(route.id) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id))    
-    `);
+        "maxGrade" = (SELECT MAX(route.grade) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id)),
+        "minGrade" = (SELECT MIN(route.grade) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id)),
+        "nrRoutes" = (SELECT COUNT(route.id) FROM route WHERE route."sectorId" IN (SELECT sector.id FROM sector WHERE sector."cragId" = crag.id))
+      `);
 
     } else {
       const cragQuery = await dbs.target.query("SELECT id, name, legacy FROM \"crag\"");
@@ -139,6 +161,15 @@ export default class Migrate extends Command {
         const legacy = JSON.parse(crag.legacy);
         if (JSON.parse(crag.legacy)) {
           dbs.idmap.crags[legacy.CragID] = crag.id;
+        }
+      });
+
+      const areasQuery = await dbs.target.query("SELECT id, name, legacy FROM \"area\"");
+
+      areasQuery.rows.forEach(area => {
+        const legacy = JSON.parse(area.legacy);
+        if (JSON.parse(area.legacy)) {
+          dbs.idmap.areas[legacy.AreaID] = area.id;
         }
       });
 
@@ -178,10 +209,18 @@ export default class Migrate extends Command {
       });
     }
 
+    // if (flags.all || flags.images) {
+    //   this.log("# IMAGES");
+
+    //   const imagesTransfer = new Images(dbs);
+    //   await imagesTransfer.start();
+
+    // }
+
     this.log("### MIGRATION DONE ###");
 
     this.exit(0);
   }
-  
+
 
 }

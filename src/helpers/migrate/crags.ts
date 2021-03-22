@@ -19,7 +19,7 @@ export class Crags extends Transfer {
         const bbchtml = new Bbchtml;
 
         const sourceRes = await this.dbs.source.request()
-            .query('SELECT * FROM dbo.Crags WHERE PeakID IS NULL');
+            .query('SELECT * FROM dbo.Crags');
 
         let xmlData;
 
@@ -48,6 +48,7 @@ export class Crags extends Transfer {
                 slug: slug + slugPfx,
                 countryId: this.dbs.idmap.countries[record.CragCountry],
                 areaId: this.dbs.idmap.areas[record.ParentID] != null ? this.dbs.idmap.areas[record.ParentID] : null,
+                peakId: this.dbs.idmap.peaks[record.PeakID] != null ? this.dbs.idmap.peaks[record.PeakID] : null,
                 status: record.HideLevel == 1 ? 5 : 10,
                 lon: lngLat[0] == 0 ? null : lngLat[0] ,
                 lat: lngLat[1] == 0 ? null : lngLat[1],
@@ -65,15 +66,16 @@ export class Crags extends Transfer {
 
     async createCrag(crag: any) {
         await this.dbs.target.query(`
-            INSERT INTO crag 
-            (id, name, slug, \"countryId\", \"areaId\", status, lat, lon, orientation, access, description, legacy) 
-            VALUES 
-            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`, [
+            INSERT INTO crag
+            (id, name, slug, \"countryId\", \"areaId\", \"peakId\", status, lat, lon, orientation, access, description, legacy)
+            VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, [
             crag.id,
             crag.name,
             crag.slug,
             crag.countryId,
             crag.areaId,
+            crag.peakId,
             crag.status,
             crag.lat,
             crag.lon,

@@ -10,75 +10,95 @@ const wgsProjection: string = '+proj=longlat +datum=WGS84 +no_defs'
 
 export class Comments extends Transfer {
 
-    idMap: any = {};
+  idMap: any = {};
 
-    async start() {
-        
-        const types: any = {
-            W: "warning",
-            S: "condition",
-            N: "description",
-            C: "comment"
-        };
-        
-        this.dbs.target.query("TRUNCATE comment CASCADE;")
+  async start() {
 
-        const bbchtml = new Bbchtml;
+    const types: any = {
+      W: "warning",
+      S: "condition",
+      N: "description",
+      C: "comment"
+    };
 
-        let sourceRes = await this.dbs.source.request()
-            .query('SELECT * FROM dbo.CragComments');
+    this.dbs.target.query("TRUNCATE comment CASCADE;")
 
-        for (let record of sourceRes.recordset) {
+    const bbchtml = new Bbchtml;
 
-            await this.createComment({
-                id: v4(),
-                type: types[record.CommentType] ?? 'comment',
-                content: bbchtml.conv(record.CommentText),
-                userId: this.dbs.idmap.users[record.UserID] ?? null,
-                cragId: this.dbs.idmap.crags[record.CragID],
-                routeId: null,
-                created: record.LastModified,
-                legacy: record
-            })
 
+    const sources = [
+      {
+        table: "CragComments",
+        ref: "CragID",
+        obj: "crags",
+        id: "cragId"
+      },
+      {
+        table: "RouteComments",
+        ref: "RouteID",
+        obj: "routes",
+        id: "routeId"
+      },
+      {
+        table: "IceFallComments",
+        ref: "IceFallID",
+        obj: "iceFalls",
+        id: "iceFallId"
+      },
+      {
+        table: "PeakComments",
+        ref: "PeakID",
+        obj: "peaks",
+        id: "peakId"
+      },
+    ];
+
+    let sourceRes;
+    let current: any;
+
+    for (let source of sources) {
+      sourceRes = await this.dbs.source.request().query(`SELECT * FROM dbo.${source.table}`);
+
+      for (let record of sourceRes.recordset) {
+
+        current = {
+          id: v4(),
+          type: types[record.CommentType] ?? 'comment',
+          content: bbchtml.conv(record.CommentText),
+          userId: this.dbs.idmap.users[record.UserID] ?? null,
+          cragId: null,
+          routeId: null,
+          peakId: null,
+          iceFallId: null,
+          created: record.LastModified,
+          legacy: record
         }
 
-        sourceRes = await this.dbs.source.request()
-            .query('SELECT * FROM dbo.RouteComments');
-
-        for (let record of sourceRes.recordset) {
-
-            if (this.dbs.idmap.crags[record.RouteID] != null) {
-
-                await this.createComment({
-                    id: v4(),
-                    type: types[record.CommentType] ?? 'comment',
-                    content: record.CommentText,
-                    userId: this.dbs.idmap.users[record.UserID] ?? null,
-                    cragId: null,
-                    routeId: this.dbs.idmap.routes[record.RouteID],
-                    created: record.LastModified,
-                    legacy: record
-                })
-            }
-
+        if (this.dbs.idmap[source.obj][record[source.ref]] != null) {
+          current[source.id] = this.dbs.idmap[source.obj][record[source.ref]];
+          await this.createComment(current);
         }
+      }
     }
 
-    async createComment(comment: any) {
-        await this.dbs.target.query(`
-            INSERT INTO comment 
-            (id, type, content, \"userId\", \"cragId\", \"routeId\", created, legacy) 
-            VALUES 
-            ($1, $2, $3, $4, $5, $6, $7, $8)`, [
-            comment.id,
-            comment.type,
-            comment.content,
-            comment.userId,
-            comment.cragId,
-            comment.routeId,
-            comment.created,
-            JSON.stringify(comment.legacy)
-        ]);
-    }
+  }
+
+  async createComment(comment: any) {
+    await this.dbs.target.query(`
+            INSERT INTO comment
+            (id, type, content, \"userId\", \"cragId\", \"routeId\", \"peakId\", \"iceFallId\", created, legacy)
+            VALUES
+            ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`, [
+      comment.id,
+      comment.type,
+      comment.content,
+      comment.userId,
+      comment.cragId,
+      comment.routeId,
+      comment.peakId,
+      comment.iceFallId,
+      comment.created,
+      JSON.stringify(comment.legacy)
+    ]);
+  }
 }
